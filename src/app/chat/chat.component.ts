@@ -16,7 +16,10 @@ export class ChatComponent implements OnInit{
   conectado: boolean = false;
   mensaje: Mensaje = new Mensaje();
   mensajes: Mensaje[] = [];
+  escribiendo: string = '';
+  clienteID: string = '';
   constructor() {
+    this.clienteID = 'id-'+new Date().getUTCMilliseconds() + '-' + Math.random().toString(36).substring(2);
   }
 
   ngOnInit() {
@@ -43,6 +46,27 @@ export class ChatComponent implements OnInit{
         console.log("Objeto mensaje: "+ JSON.stringify(mensaje));
       });
 
+      //Mensaje escribiendo
+      this.client.subscribe('/chat/escribiendo', (e:any)=>{
+        this.escribiendo = e.body;
+        setTimeout(() => this.escribiendo='', 3000);
+
+      });
+
+
+      //Historial
+      console.log("ID cliente: "+this.clienteID)
+      this.client.subscribe('/chat/historial/'+this.clienteID, (e:any)=>{
+        const historial = JSON.parse(e.body) as Mensaje[];
+        this.mensajes=historial.map(m =>{
+          m.fecha = new Date(m.fecha);
+          return m;
+          }).reverse();
+      });
+
+      this.client.publish({destination: '/app/historial', body: this.clienteID});
+
+
       this.mensaje.tipo='NUEVO_USUARIO';
       this.client.publish({destination: '/app/mensaje', body: JSON.stringify(this.mensaje)})
     }
@@ -50,6 +74,8 @@ export class ChatComponent implements OnInit{
     this.client.onDisconnect = (frame:any) => {
       console.log('Desconectados: '+ !this.client.connected + ' : ' + frame);
       this.conectado=false;
+      this.mensaje = new Mensaje();
+      this.mensajes = [];
     }
   }
 
@@ -65,5 +91,10 @@ export class ChatComponent implements OnInit{
     this.mensaje.tipo='MENSAJE';
     this.client.publish({destination: '/app/mensaje', body: JSON.stringify(this.mensaje)})
     this.mensaje.texto='';
+  }
+
+  escribiendoEvento(): void{
+    this.client.publish({destination: '/app/escribiendo', body: this.mensaje.username});
+
   }
 }
